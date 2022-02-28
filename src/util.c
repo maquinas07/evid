@@ -17,13 +17,14 @@
 **/
 
 #include "util.h"
-#include <libnotify/notification.h>
 
 #ifdef HAVE_NOTIFY
 #include "libnotify/notify.h"
+#include <libnotify/notification.h>
 #endif
 
 #include <errno.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,7 +60,7 @@ void die(const char *errstr, ...) {
   va_start(argp, errstr);
   verror(errstr, argp);
   va_end(argp);
-  exit(1);
+  raise(SIGINT);
 }
 
 void print_usage() {

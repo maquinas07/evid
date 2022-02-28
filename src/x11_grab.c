@@ -67,10 +67,14 @@ void ungrab_keys(Display *dpy, Window *active_window, unsigned char actions) {
   for (unsigned int mod = 0; mod < ARR_SIZE(special_modifiers); mod++) {
     XUngrabKey(dpy, XKeysymToKeycode(dpy, ABORT_KEYSYM),
                ABORT_MODFIELD | special_modifiers[mod], *active_window);
-    XUngrabKey(dpy, XKeysymToKeycode(dpy, SAVE_KEYSYM),
-               SAVE_MODFIELD | special_modifiers[mod], *active_window);
-    XUngrabKey(dpy, XKeysymToKeycode(dpy, COPY_KEYSYM),
-               COPY_MODFIELD | special_modifiers[mod], *active_window);
+    if ((SAVE & actions) == SAVE) {
+      XUngrabKey(dpy, XKeysymToKeycode(dpy, SAVE_KEYSYM),
+                 SAVE_MODFIELD | special_modifiers[mod], *active_window);
+    }
+    if ((COPY & actions) == COPY) {
+      XUngrabKey(dpy, XKeysymToKeycode(dpy, COPY_KEYSYM),
+                 COPY_MODFIELD | special_modifiers[mod], *active_window);
+    }
   }
   XSetErrorHandler(NULL);
 }
@@ -79,8 +83,7 @@ int handle_x_error(Display *dpy, XErrorEvent *error) {
   // Ignore BadAccess error on grabs
   switch (error->error_code) {
   case BadAccess: {
-    if (error->request_code == 33 /* grab key */
-        || error->request_code == 34 /* ungrab_key */) {
+    if (error->request_code == 33 /* grab key */) {
       die("failed to grab needed keys\n");
       return 0;
     }

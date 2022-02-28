@@ -56,7 +56,7 @@
 #define HQGIF 2
 
 static pid_t subp = 0;
-static char tmp_file[FILENAME_MAX];
+static char tmp_file[FILENAME_MAX] = {0};
 
 static void shutdown(int signo) {
   if (subp) {
@@ -67,8 +67,9 @@ static void shutdown(int signo) {
       waitpid(subp, NULL, 0);
     }
   }
-
-  remove_file(tmp_file);
+  if (ARR_SIZE(tmp_file) > 0) {
+    remove_file(tmp_file);
+  }
   exit(EXIT_FAILURE);
 }
 
