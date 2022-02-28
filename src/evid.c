@@ -37,18 +37,24 @@
 #define LQGIF 1
 #define HQGIF 2
 
-static void process_args(Args *args, int argc, char **argv) {
-#ifdef HAVE_ZENITY
-  args->use_zenity = 0;
-#endif
-  args->framerate = "10";
-  args->audio = NULL;
-  args->verbosity = QUIET;
-  args->draw_mouse = 1;
-  args->show_region = 0;
-  args->gif = 0;
-  args->output = NULL;
+static pid_t subp = 0;
+static char tmp_file[FILENAME_MAX];
 
+static void shutdown(int signo) {
+  if (subp) {
+    kill(subp, signo);
+    sleep(1);
+    if (!waitpid(subp, NULL, WNOHANG)) {
+      kill(SIGKILL, subp);
+      waitpid(subp, NULL, 0);
+    }
+  }
+
+  remove_file(tmp_file);
+  exit(EXIT_FAILURE);
+}
+
+static void process_args(Args *args, int argc, char **argv) {
   struct option long_opts[] = {
       {"info", no_argument, &args->verbosity, INFO},
       {"debug", no_argument, &args->verbosity, DEBUG},
@@ -99,16 +105,22 @@ static void process_args(Args *args, int argc, char **argv) {
       break;
     }
     case ('a'): {
-      char *default_audio[] = {"alsa", "-ac", "2", "-i", "default", NULL};
+      args->audio->subsystem = "pulse";
+      args->audio->input = "default";
       if (optarg) {
-        if (!strcmp(optarg, "pulse")) {
-          default_audio[0] = "pulse";
-        } else if (!strcmp(optarg, "alsa")) {
+        char *subsystem = strtok(optarg, ",");
+        char *input = strtok(NULL, ",");
+
+        if (!strcmp(subsystem, "alsa")) {
+          args->audio->subsystem = subsystem;
+        } else if (strcmp(optarg, "pulse")) {
           print_usage();
           exit(EXIT_FAILURE);
         }
+        if (input) {
+          args->audio->input = input;
+        }
       }
-      args->audio = default_audio;
       break;
     }
     case ('h'): {
@@ -120,6 +132,23 @@ static void process_args(Args *args, int argc, char **argv) {
       exit(EXIT_FAILURE);
     }
     }
+  }
+
+  if (args->verbosity == DEBUG) {
+    printf("Parsed arguments: \n\tGif: %d\n\tFramerate: "
+           "%s\n\tShow region: %d\n\tAudio subsystem: %s\n\tAudio input "
+           "device: %s\n\tOutput: %s\n"
+#ifdef HAVE_ZENITY
+           "\tUse zenity: %d"
+#endif
+           ,
+           args->gif, args->framerate, args->show_region,
+           args->audio->subsystem, args->audio->input, args->output
+#ifdef HAVE_ZENITY
+           ,
+           args->use_zenity
+#endif
+    );
   }
 }
 
@@ -170,14 +199,18 @@ static int exec_ffmpeg(Args *args, _Region selected_region, char *tmp_file) {
   char *fargs[50];
   fargs[fargsc++] = "ffmpeg";
   fargs[fargsc++] = "-y";
+  if (args->audio->subsystem && args->audio->input && !args->gif) {
+    fargs[fargsc++] = "-f";
+    fargs[fargsc++] = args->audio->subsystem;
+    fargs[fargsc++] = "-ac";
+    fargs[fargsc++] = "2";
+    fargs[fargsc++] = "-i";
+    fargs[fargsc++] = args->audio->input;
+    fargs[fargsc++] = "-acodec";
+    fargs[fargsc++] = "aac";
+  }
   fargs[fargsc++] = "-f";
   fargs[fargsc++] = "x11grab";
-  if (args->audio && !args->gif) {
-    fargs[fargsc++] = "-f";
-    for (unsigned int i = 0; args->audio[i]; i++) {
-      fargs[fargsc++] = args->audio[i];
-    }
-  }
   fargs[fargsc++] = "-video_size";
   char video_size[10];
   fargs[fargsc] = video_size;
@@ -298,6 +331,19 @@ int main(int argc, char *argv[]) {
   setenv("GDK_BACKEND", "x11", 1);
 
   Args args = {0};
+  Audio audio = {0};
+
+#ifdef HAVE_ZENITY
+  args->use_zenity = 0;
+#endif
+  args.framerate = "10";
+  args.audio = &audio;
+  args.verbosity = QUIET;
+  args.draw_mouse = 1;
+  args.show_region = 0;
+  args.gif = 0;
+  args.output = NULL;
+
   process_args(&args, argc, argv);
 
   Display *dpy = XOpenDisplay(NULL);
@@ -324,7 +370,6 @@ int main(int argc, char *argv[]) {
     die("selected region is empty\n");
   }
 
-  char tmp_file[FILENAME_MAX];
   if (get_tmp_file(tmp_file, sizeof(tmp_file), &args) <= 0) {
     die("failed to get a temporary file\n");
   }
@@ -338,6 +383,10 @@ int main(int argc, char *argv[]) {
       die("failed to launch ffmpeg, error: %s\n", strerror(errno));
     }
   } else {
+    subp = pid;
+    signal(SIGTERM, &shutdown);
+    signal(SIGINT, &shutdown);
+
     int status = 0;
     unsigned char action = run_supervise_loop(pid, dpy, &root, &status);
     XCloseDisplay(dpy);
@@ -389,7 +438,6 @@ int main(int argc, char *argv[]) {
       }
     }
   }
-
   remove_file(tmp_file);
 
 #ifdef HAVE_NOTIFY

@@ -13,8 +13,15 @@ struct _Region {
   unsigned int d; /* depth */
 };
 
+typedef struct Audio Audio;
+struct Audio {
+  char *subsystem;
+  char *input;
+};
+
 typedef struct Args Args;
 struct Args {
+  Audio *audio;
   int verbosity;
 #ifdef HAVE_ZENITY
   int use_zenity;
@@ -24,7 +31,6 @@ struct Args {
   int gif;
   char *framerate;
   char *output;
-  char **audio;
 };
 
 #endif
