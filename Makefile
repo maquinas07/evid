@@ -1,5 +1,6 @@
 PREFIX=/usr/local/
 
+# Comment if you want to disable the dependency to libnotify. Errors will be printed to stderr.
 INCLUDE_DIRS_NOTIFY=/usr/include/glib-2.0 /usr/lib/glib-2.0/include /usr/include/gdk-pixbuf-2.0
 CFLAGS_NOTIFY=-DHAVE_NOTIFY $(INCLUDE_DIRS_NOTIFY:%=-I%)
 LDFLAGS_NOTIFY=-lnotify
