@@ -12,31 +12,35 @@
 #include <string.h>
 #include <sys/stat.h>
 
-void error(const char *errstr, ...) {
-  va_list ap;
-  fprintf(stderr, "%s: ", PROGRAM_NAME);
-  va_start(ap, errstr);
-  vfprintf(stderr, errstr, ap);
-
+static void verror(const char *errstr, va_list argp) {
 #ifdef HAVE_NOTIFY
-  char error_notification_summary[50];
+  char error_notification_summary[20] = {0};
+  char error_notification_body[100] = {0};
   snprintf(error_notification_summary, ARR_SIZE(error_notification_summary),
-           "%s: %s", PROGRAM_NAME, errstr);
-  NotifyNotification *error_notification =
-      notify_notification_new(error_notification_summary, NULL, NULL);
+           "%s - error", PROGRAM_NAME);
+  vsnprintf(error_notification_body, ARR_SIZE(error_notification_body), errstr,
+            argp);
+  NotifyNotification *error_notification = notify_notification_new(
+      error_notification_summary, error_notification_body, NULL);
   notify_notification_show(error_notification, NULL);
+#else
+  fprintf(stderr, "%s: ", PROGRAM_NAME);
+  vfprintf(stderr, errstr, argp);
 #endif
+}
 
-  va_end(ap);
+void error(const char *errstr, ...) {
+  va_list argp;
+  va_start(argp, errstr);
+  verror(errstr, argp);
+  va_end(argp);
 }
 
 void die(const char *errstr, ...) {
-  va_list args;
-
-  va_start(args, errstr);
-  error(errstr, args);
-  va_end(args);
-
+  va_list argp;
+  va_start(argp, errstr);
+  verror(errstr, argp);
+  va_end(argp);
   exit(1);
 }
 

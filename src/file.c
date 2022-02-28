@@ -47,8 +47,7 @@ int get_output_file(char *new_file, size_t new_file_size, Args *args) {
     if (fstat(output_fd, &st) == -1) {
       close(output_fd);
       die("fatal error obtaining file status, failed with "
-          "error: "
-          "%s\n",
+          "error: %s\n",
           strerror(errno));
     }
     if (S_ISDIR(st.st_mode)) {

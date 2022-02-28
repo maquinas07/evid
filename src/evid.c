@@ -14,6 +14,7 @@
 #include <X11/Xlib.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -122,6 +123,23 @@ static void process_args(Args *args, int argc, char **argv) {
   }
 }
 
+static void set_verbose(char **fargs, int verbose) {
+  if (verbose == DEBUG) {
+    fprintf(stdout, "Executing ffmpeg with command: ");
+    char **i = fargs;
+    for (; *i; ++i) {
+      fprintf(stdout, "%s ", *i);
+    }
+    fprintf(stdout, "\n");
+    *i++ = "-loglevel";
+    *i++ = "debug";
+    *i = NULL;
+  } else if (verbose == QUIET) {
+    close(2);
+    open("/dev/null", O_RDWR);
+  }
+}
+
 static void create_gif(Args *args, char *source, char *dest) {
   pid_t pid = fork();
   if (pid < 0) {
@@ -129,29 +147,20 @@ static void create_gif(Args *args, char *source, char *dest) {
   } else if (pid == 0) {
     int fargsc = 0;
     char *fargs[50];
-
     fargs[fargsc++] = "ffmpeg";
     fargs[fargsc++] = "-y";
-    if (args->verbosity == DEBUG) {
-      fargs[fargsc++] = "-loglevel";
-      fargs[fargsc++] = "debug";
-    }
     fargs[fargsc++] = "-i";
     fargs[fargsc++] = source;
     fargs[fargsc++] = "-vf";
     fargs[fargsc++] = "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse";
     fargs[fargsc++] = dest;
     fargs[fargsc] = NULL;
-    if (args->verbosity == DEBUG) {
-      fprintf(stdout, "Executing ffmpeg with command: ");
-      for (char **i = fargs; *i; ++i) {
-        fprintf(stdout, "%s ", *i);
-      }
-      fprintf(stdout, "\n");
-    }
+    set_verbose(fargs, args->verbosity);
     execvp(fargs[0], fargs);
   }
-  if (wait(NULL) == -1) {
+  int status = 0;
+  if (wait(&status) == -1 || status) {
+    remove_file(source);
     die("failed to generate gif from %s\n", source);
   }
 }
@@ -161,10 +170,6 @@ static int exec_ffmpeg(Args *args, _Region selected_region, char *tmp_file) {
   char *fargs[50];
   fargs[fargsc++] = "ffmpeg";
   fargs[fargsc++] = "-y";
-  if (args->verbosity == DEBUG) {
-    fargs[fargsc++] = "-loglevel";
-    fargs[fargsc++] = "debug";
-  }
   fargs[fargsc++] = "-f";
   fargs[fargsc++] = "x11grab";
   if (args->audio && !args->gif) {
@@ -220,13 +225,7 @@ static int exec_ffmpeg(Args *args, _Region selected_region, char *tmp_file) {
   }
   fargs[fargsc++] = tmp_file;
   fargs[fargsc] = NULL;
-  if (args->verbosity == DEBUG) {
-    fprintf(stdout, "Executing ffmpeg with command: ");
-    for (char **i = fargs; *i; ++i) {
-      fprintf(stdout, "%s ", *i);
-    }
-    fprintf(stdout, "\n");
-  }
+  set_verbose(fargs, args->verbosity);
   return execvp(fargs[0], fargs);
 }
 
@@ -328,7 +327,7 @@ int main(int argc, char *argv[]) {
   char tmp_file[FILENAME_MAX];
   if (get_tmp_file(tmp_file, sizeof(tmp_file), &args) <= 0) {
     die("failed to get a temporary file\n");
-  };
+  }
 
   pid_t pid = fork();
   if (pid < 0) {
