@@ -54,7 +54,7 @@ void print_usage() {
       "valid options are pulse and alsa with a comma separated input device, "
       "defaults to pulse,default.\n --no-draw-mouse\thides the pointer in the "
       "output video.\n -g|--gif\toutputs the recording to a gif\n "
-      "-o|--output\tsaves the recording into this file or directory"
+      "-o|--output\tsaves the recording into this file or directory\n"
 #ifdef HAVE_ZENITY
       " -z|--use-zenity\tuses a file selection dialog "
       "from zenity instead of a default path to save the output "
