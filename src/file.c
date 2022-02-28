@@ -1,6 +1,7 @@
 #include "file.h"
 #include "util.h"
 
+#include <asm-generic/errno-base.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -18,7 +19,7 @@
 void get_default_file_name(char *default_file_name, Args *args) {
   time_t rawtime = time(NULL);
   struct tm *tm = localtime(&rawtime);
-  strftime(default_file_name, FILENAME_MAX, "evid%Y%m%d%H%M", tm);
+  strftime(default_file_name, FILENAME_MAX, "evid%Y%m%d%H%M%S", tm);
   if (args->gif) {
     strcat(default_file_name, ".gif");
   } else {
@@ -43,19 +44,18 @@ int get_output_file(char *new_file, size_t new_file_size, Args *args) {
 
   if (args->output) {
     int output_fd = open(args->output, O_RDONLY);
-    struct stat st;
-    if (fstat(output_fd, &st) == -1) {
+    if (output_fd == -1 && errno != ENOENT) {
       close(output_fd);
       die("fatal error obtaining file status, failed with "
           "error: %s\n",
           strerror(errno));
     }
-    if (S_ISDIR(st.st_mode)) {
+    struct stat st;
+    if (fstat(output_fd, &st) != -1 && S_ISDIR(st.st_mode)) {
       return snprintf(new_file, new_file_size, "%s/%s", args->output,
                       default_file_name);
-    } else {
-      return snprintf(new_file, new_file_size, "%s", args->output);
     }
+    return snprintf(new_file, new_file_size, "%s", args->output);
   } else {
     FILE *pipep = NULL;
 #ifdef HAVE_ZENITY
