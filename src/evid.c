@@ -449,11 +449,23 @@ int main(int argc, char *argv[]) {
         notify_notification_show(success_notification, NULL);
 #endif
       }
-      case COPY:
-      // Seems unnecesary for now since no application I know of handles mp4
-      // or gif mime-types
-      default:
+      case COPY: {
+        // Seems unnecesary for now since no application I know of handles mp4
+        // or gif mime-types
         break;
+      }
+      default: {
+#ifdef HAVE_NOTIFY
+        char success_notification_summary[50];
+        snprintf(success_notification_summary,
+                 ARR_SIZE(success_notification_summary), "%s: %s", PROGRAM_NAME,
+                 "recording was cancelled");
+        NotifyNotification *success_notification =
+            notify_notification_new(success_notification_summary, NULL, NULL);
+        notify_notification_show(success_notification, NULL);
+#endif
+        break;
+      }
       }
     }
   }
