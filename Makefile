@@ -12,7 +12,7 @@ LDFLAGS_NOTIFY=-lnotify
 # Uncomment if you want to be able to select the output folder via zenity
 # CFLAGS_ZENITY=-DHAVE_ZENITY
 
-CFLAGS_ALL=-Wall -Wpedantic $(CFLAGS_NOTIFY) $(CFLAGS_ZENITY) $(CFLAGS_XEXTENSIONS)
+CFLAGS_ALL=-Wall -Wpedantic -O2 $(CFLAGS_NOTIFY) $(CFLAGS_ZENITY) $(CFLAGS_XEXTENSIONS)
 LDFLAGS_ALL=-lX11 $(LDFLAGS_NOTIFY) $(LDFLAGS_XEXTENSIONS)
 
 SRC_DIR=src
