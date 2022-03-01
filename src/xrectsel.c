@@ -24,6 +24,11 @@
 #include <X11/Xutil.h>
 #include <X11/cursorfont.h>
 
+#ifdef HAVE_XEXTENSIONS
+#include <X11/extensions/Xfixes.h>
+#include <X11/extensions/shape.h>
+#endif
+
 int select_region(Display *dpy, Window root, _Region *region) {
   _Region rr; /* root region */
   _Region sr; /* selected region */
@@ -61,6 +66,13 @@ int select_region(Display *dpy, Window root, _Region *region) {
   XChangeProperty(dpy, w, wm_state, XA_ATOM, 32, PropModeAppend,
                   (const unsigned char *)&wm_stays_on_top, 1);
 
+#ifdef HAVE_XEXTENSIONS
+  XRectangle rect;
+  XserverRegion reg = XFixesCreateRegion(dpy, &rect, 1);
+  XFixesSetWindowShapeRegion(dpy, w, ShapeInput, 0, 0, reg);
+  XFixesDestroyRegion(dpy, reg);
+#endif
+
   XSizeHints *xh = XAllocSizeHints();
   xh->width = rr.w;
   xh->height = rr.h;
@@ -96,6 +108,9 @@ int select_region(Display *dpy, Window root, _Region *region) {
 
   grab_keys(dpy, &root, 0);
 
+#ifdef HAVE_XEXTENSIONS
+  Window clicked_window = 0;
+#endif
   XEvent event;
   for (;;) {
     XNextEvent(dpy, &event);
@@ -144,6 +159,9 @@ int select_region(Display *dpy, Window root, _Region *region) {
       break;
     }
     case ButtonRelease: {
+#ifdef HAVE_XEXTENSIONS
+      clicked_window = event.xbutton.subwindow;
+#endif
       done = 1;
       break;
     }
@@ -165,10 +183,35 @@ int select_region(Display *dpy, Window root, _Region *region) {
   XDestroyWindow(dpy, w);
   XFlush(dpy);
 
-  sr.x = x;
-  sr.y = y;
-  sr.w = width;
-  sr.h = height;
+  if (!width && !height && clicked_window) {
+    XWindowAttributes attrs;
+    XGetWindowAttributes(dpy, clicked_window, &attrs);
+    Window parent = 0;
+    Window *children = 0;
+    unsigned int nchildren;
+    XQueryTree(dpy, clicked_window, &root, &parent, &children, &nchildren);
+    if (children) {
+      XFree(children);
+    }
+    if (parent == attrs.root) {
+      x = attrs.x;
+      y = attrs.y;
+    } else {
+      Window stub;
+      XTranslateCoordinates(dpy, clicked_window, attrs.root, 0, 0, &x, &y,
+                            &stub);
+    }
+    sr.x = x;
+    sr.y = y;
+    sr.w = attrs.width;
+    sr.h = attrs.height;
+  } else {
+    sr.x = x;
+    sr.y = y;
+    sr.w = width;
+    sr.h = height;
+  }
+
   /* calculate right and bottom offset */
   sr.X = rr.w - sr.x - sr.w;
   sr.Y = rr.h - sr.y - sr.h;
@@ -176,5 +219,6 @@ int select_region(Display *dpy, Window root, _Region *region) {
   sr.b = rr.b;
   sr.d = rr.d;
   *region = sr;
+
   return 0;
 }

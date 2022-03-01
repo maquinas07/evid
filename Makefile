@@ -1,5 +1,9 @@
 PREFIX=/usr/local/
 
+# Comment if you want to disable X extensions
+CFLAGS_XEXTENSIONS=-DHAVE_XEXTENSIONS
+LDFLAGS_XEXTENSIONS=-lXfixes
+
 # Comment if you want to disable the dependency to libnotify. Errors will be printed to stderr.
 INCLUDE_DIRS_NOTIFY=/usr/include/glib-2.0 /usr/lib/glib-2.0/include /usr/include/gdk-pixbuf-2.0
 CFLAGS_NOTIFY=-DHAVE_NOTIFY $(INCLUDE_DIRS_NOTIFY:%=-I%)
@@ -8,8 +12,8 @@ LDFLAGS_NOTIFY=-lnotify
 # Uncomment if you want to be able to select the output folder via zenity
 # CFLAGS_ZENITY=-DHAVE_ZENITY
 
-CFLAGS_ALL=-Wall -Wpedantic $(CFLAGS_NOTIFY) $(CFLAGS_ZENITY)
-LDFLAGS_ALL=-lX11 $(LDFLAGS_NOTIFY)
+CFLAGS_ALL=-Wall -Wpedantic $(CFLAGS_NOTIFY) $(CFLAGS_ZENITY) $(CFLAGS_XEXTENSIONS)
+LDFLAGS_ALL=-lX11 $(LDFLAGS_NOTIFY) $(LDFLAGS_XEXTENSIONS)
 
 SRC_DIR=src
 OBJ_DIR=obj
