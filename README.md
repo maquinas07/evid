@@ -7,11 +7,12 @@ Build requirements
 ---
  - libx11   
  - libnotify - Optional (enabled by default, modify the Makefile to disable)
+ - libXfixes - Optional (enabled by default, modify the Makefile to disable)
 
 Runtime requirements
 ---
  - ffmpeg 
- - zenity - Optional   
+ - zenity - Optional (disabled by default, modify the Makefile to enable)
 
 Compile from source
 ---
@@ -24,7 +25,7 @@ make install
 
 Usage
 ---
-evid has preconfigured default values so you can just execute the binary, select the area to record and when you're done just press CTRL+s. evid doesn't have any config files so to change the default shortcuts you will need to modify [src/actions.h](./src/actions.h) and recompile. 
+evid has preconfigured default values so you can just execute the binary, select the area to record and when you're done just press CTRL+s. If no area is selected and evid is compiled with HAVE_XEXTENSIONS, evid will record the entire window that was clicked. evid doesn't have any config files so to change the default shortcuts you will need to modify [src/actions.h](./src/actions.h) and recompile.
 
 By default evid outputs the recordings as mp4 without any audio and saves them in `$XDG_VIDEOS_DIR/evid/` or `$HOME/Videos/evid/`.   
 You can change the output directory by setting the XDG_VIDEOS_DIR variable, the HOME variable or specify it via the argument `-o` (E.G. `-o/some/path`).   
