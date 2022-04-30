@@ -17,6 +17,7 @@
 **/
 
 #include "actions.h"
+#include "clipboard.h"
 #include "file.h"
 #include "types.h"
 #include "util.h"
@@ -45,8 +46,8 @@
 
 #define PROGRAM_NAME "evid"
 
-#define GRAB(dpy, window) grab_keys(dpy, window, SAVE)
-#define UNGRAB(dpy, window) ungrab_keys(dpy, window, SAVE)
+#define GRAB(dpy, window) grab_keys(dpy, window, SAVE | COPY)
+#define UNGRAB(dpy, window) ungrab_keys(dpy, window, SAVE | COPY)
 
 #define QUIET 0
 #define INFO 1
@@ -190,9 +191,11 @@ static void set_verbose(char **fargs, int verbose) {
 
 static void create_gif(Args *args, char *source, char *dest) {
   pid_t pid = fork();
-  if (pid < 0) {
+  switch (pid) {
+  case -1: {
     die("error forking the current process\n");
-  } else if (pid == 0) {
+  }
+  case 0: {
     int fargsc = 0;
     char *fargs[50];
     fargs[fargsc++] = "ffmpeg";
@@ -206,10 +209,13 @@ static void create_gif(Args *args, char *source, char *dest) {
     set_verbose(fargs, args->verbosity);
     execvp(fargs[0], fargs);
   }
-  int status = 0;
-  if (wait(&status) == -1 || status) {
-    remove_file(source);
-    die("failed to generate gif from %s\n", source);
+  default: {
+    int status = 0;
+    if (wait(&status) == -1 || status) {
+      remove_file(source);
+      die("failed to generate gif from %s\n", source);
+    }
+  }
   }
 }
 
@@ -296,7 +302,7 @@ static unsigned char get_matching_action(Display *dpy, XKeyEvent event) {
   return 0;
 }
 
-static unsigned char run_supervise_loop(pid_t sub_process_pid, Display *dpy,
+static unsigned char run_supervise_loop(pid_t process_pid, Display *dpy,
                                         Window *root, int *status) {
   unsigned char action = 0;
 
@@ -310,7 +316,7 @@ static unsigned char run_supervise_loop(pid_t sub_process_pid, Display *dpy,
   update_active_window(&active_window, dpy, root, &net_active_window);
   GRAB(dpy, &active_window);
 
-  while (!waitpid(sub_process_pid, status, WNOHANG)) {
+  while (!waitpid(process_pid, status, WNOHANG)) {
     while (XPending(dpy)) {
       XEvent event;
       XNextEvent(dpy, &event);
@@ -330,7 +336,7 @@ static unsigned char run_supervise_loop(pid_t sub_process_pid, Display *dpy,
           XAllowEvents(dpy, ReplayKeyboard, event.xkey.time);
           XFlush(dpy);
         } else {
-          kill(sub_process_pid, SIGTERM);
+          kill(process_pid, SIGTERM);
         }
       }
       }
@@ -392,23 +398,21 @@ int main(int argc, char *argv[]) {
   if (get_tmp_file(tmp_file, sizeof(tmp_file), &args) <= 0) {
     die("failed to get a temporary file\n");
   }
-
-  pid_t pid = fork();
-  if (pid < 0) {
+  subp = fork();
+  switch (subp) {
+  case -1: {
     die("error forking the current process\n");
-  } else if (pid == 0) {
-    int ffmpeg_err = exec_ffmpeg(&args, selected_region, tmp_file);
-    if (ffmpeg_err) {
-      die("failed to launch ffmpeg, error: %s\n", strerror(errno));
-    }
-  } else {
-    subp = pid;
+  }
+  case 0: {
+    exec_ffmpeg(&args, selected_region, tmp_file);
+    die("failed to launch ffmpeg, error: %s\n", strerror(errno));
+  }
+  default: {
     signal(SIGTERM, &shutdown);
     signal(SIGINT, &shutdown);
 
     int status = 0;
-    unsigned char action = run_supervise_loop(pid, dpy, &root, &status);
-    XCloseDisplay(dpy);
+    unsigned char action = run_supervise_loop(subp, dpy, &root, &status);
 
     if (WEXITSTATUS(status) == EXIT_FAILURE) {
       return EXIT_FAILURE;
@@ -439,6 +443,8 @@ int main(int argc, char *argv[]) {
           move_file(tmp_file, new_file);
         }
 
+        remove_file(tmp_file);
+
 #ifdef HAVE_NOTIFY
         char success_notification_summary[50];
         snprintf(success_notification_summary,
@@ -448,11 +454,21 @@ int main(int argc, char *argv[]) {
             success_notification_summary, new_file, NULL);
         notify_notification_show(success_notification, NULL);
 #endif
+        break;
       }
       case COPY: {
-        // Seems unnecesary for now since no application I know of handles mp4
-        // or gif mime-types
-        break;
+        if (!copy_file(tmp_file)) {
+#ifdef HAVE_NOTIFY
+          char success_notification_summary[50];
+          snprintf(success_notification_summary,
+                   ARR_SIZE(success_notification_summary), "%s: %s",
+                   PROGRAM_NAME, "recording saved to clipboard");
+          NotifyNotification *success_notification =
+              notify_notification_new(success_notification_summary, NULL, NULL);
+          notify_notification_show(success_notification, NULL);
+#endif
+          break;
+        }
       }
       default: {
 #ifdef HAVE_NOTIFY
@@ -469,10 +485,11 @@ int main(int argc, char *argv[]) {
       }
     }
   }
-  remove_file(tmp_file);
+  }
 
 #ifdef HAVE_NOTIFY
   notify_uninit();
 #endif
+  XCloseDisplay(dpy);
   return EXIT_SUCCESS;
 }
