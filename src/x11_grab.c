@@ -33,12 +33,14 @@ void update_active_window(Window *active_window, Display *dpy, Window *root,
   int actual_format;
   unsigned long nItems;
   unsigned long bytesAfter;
-  unsigned char *prop;
+  unsigned char *prop = 0;
   if (XGetWindowProperty(dpy, *root, *net_active_window, 0, 1024, False,
                          AnyPropertyType, &actual_type, &actual_format, &nItems,
                          &bytesAfter, &prop) == Success) {
-    *active_window = *(unsigned long *)prop;
-    XFree(prop);
+    if (prop) {
+      *active_window = *(unsigned long *)prop;
+      XFree(prop);
+    }
   }
 }
 
