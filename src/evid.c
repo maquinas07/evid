@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 **/
 
+#include "evid.h"
 #include "actions.h"
 #include "clipboard.h"
 #include "file.h"
@@ -43,8 +44,6 @@
 #include <bits/getopt_core.h>
 #include <linux/limits.h>
 #include <sys/wait.h>
-
-#define PROGRAM_NAME "evid"
 
 #define GRAB(dpy, window) grab_keys(dpy, window, SAVE | COPY)
 #define UNGRAB(dpy, window) ungrab_keys(dpy, window, SAVE | COPY)
@@ -88,10 +87,11 @@ static void process_args(Args *args, int argc, char **argv) {
       {"audio", optional_argument, NULL, 'a'},
       {"output", required_argument, NULL, 'o'},
       {"help", no_argument, NULL, 'h'},
+      {"version", no_argument, NULL, 'v'},
       {NULL, 0, NULL, 0}};
 
   int opt;
-  while ((opt = getopt_long(argc, argv, "idzgo:f:a::h", long_opts, NULL)) !=
+  while ((opt = getopt_long(argc, argv, "idzgo:f:a::hv", long_opts, NULL)) !=
          -1) {
     switch (opt) {
     case ('i'): {
@@ -142,6 +142,10 @@ static void process_args(Args *args, int argc, char **argv) {
         }
       }
       break;
+    }
+    case ('v'): {
+      print_version();
+      exit(EXIT_SUCCESS);
     }
     case ('h'): {
       print_usage();

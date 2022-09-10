@@ -17,6 +17,7 @@
 **/
 
 #include "util.h"
+#include "evid.h"
 
 #ifdef HAVE_NOTIFY
 #include "libnotify/notify.h"
@@ -63,7 +64,11 @@ void die(const char *errstr, ...) {
   raise(SIGINT);
 }
 
-void print_usage() {
+void print_version(void) {
+  fprintf(stdout, "%s version %s\n", PROGRAM_NAME, PROGRAM_VERSION);
+}
+
+void print_usage(void) {
   fprintf(
       stdout,
       "Usage: %s [OPTIONS] \n Available options:\n -i|--info\toutput "
@@ -73,7 +78,8 @@ void print_usage() {
       "valid options are pulse and alsa with a comma separated input device, "
       "defaults to pulse,default.\n --no-draw-mouse\thides the pointer in the "
       "output video.\n -g|--gif\toutputs the recording to a gif\n "
-      "-o|--output\tsaves the recording into this file or directory\n"
+      "-o|--output\tsaves the recording into this file or directory\n "
+      "-v|--version show program version\n"
 #ifdef HAVE_ZENITY
       " -z|--use-zenity\tuses a file selection dialog "
       "from zenity instead of a default path to save the output "

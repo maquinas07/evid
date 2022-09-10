@@ -19,12 +19,14 @@
 #ifndef EVID_UTIL_H
 #define EVID_UTIL_H
 
-#define PROGRAM_NAME "evid"
+#include "evid.h"
+
 #define ARR_SIZE(arr) (sizeof(arr) / sizeof(*arr))
 
 void error(const char *errstr, ...);
 void die(const char *errstr, ...);
 
+void print_version(void);
 void print_usage(void);
 
 #endif
