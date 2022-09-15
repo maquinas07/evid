@@ -22,6 +22,7 @@
 
 #include <X11/X.h>
 #include <X11/Xlib.h>
+#include <X11/Xproto.h>
 #include <stdio.h>
 
 unsigned int special_modifiers[] = {0, Mod2Mask, LockMask,
@@ -64,18 +65,18 @@ void grab_keys(Display *dpy, Window *window, unsigned char actions) {
   XSetErrorHandler(NULL);
 }
 
-void ungrab_keys(Display *dpy, Window *active_window, unsigned char actions) {
+void ungrab_keys(Display *dpy, Window *window, unsigned char actions) {
   XSetErrorHandler(&handle_x_error);
   for (unsigned int mod = 0; mod < ARR_SIZE(special_modifiers); mod++) {
     XUngrabKey(dpy, XKeysymToKeycode(dpy, ABORT_KEYSYM),
-               ABORT_MODFIELD | special_modifiers[mod], *active_window);
+               ABORT_MODFIELD | special_modifiers[mod], *window);
     if ((SAVE & actions) == SAVE) {
       XUngrabKey(dpy, XKeysymToKeycode(dpy, SAVE_KEYSYM),
-                 SAVE_MODFIELD | special_modifiers[mod], *active_window);
+                 SAVE_MODFIELD | special_modifiers[mod], *window);
     }
     if ((COPY & actions) == COPY) {
       XUngrabKey(dpy, XKeysymToKeycode(dpy, COPY_KEYSYM),
-                 COPY_MODFIELD | special_modifiers[mod], *active_window);
+                 COPY_MODFIELD | special_modifiers[mod], *window);
     }
   }
   XSetErrorHandler(NULL);
@@ -85,7 +86,7 @@ int handle_x_error(Display *dpy, XErrorEvent *error) {
   // Ignore BadAccess error on grabs
   switch (error->error_code) {
   case BadAccess: {
-    if (error->request_code == 33 /* grab key */) {
+    if (error->request_code == X_GrabKey) {
       die("failed to grab needed keys\n");
       return 0;
     }
