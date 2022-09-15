@@ -74,6 +74,7 @@ static void shutdown(int signo) {
 }
 
 static void process_args(Args *args, int argc, char **argv) {
+  int option_index = 0;
   struct option long_opts[] = {
       {"info", no_argument, &args->verbosity, INFO},
       {"debug", no_argument, &args->verbosity, DEBUG},
@@ -91,8 +92,8 @@ static void process_args(Args *args, int argc, char **argv) {
       {NULL, 0, NULL, 0}};
 
   int opt;
-  while ((opt = getopt_long(argc, argv, "idzgo:f:a::hv", long_opts, NULL)) !=
-         -1) {
+  while ((opt = getopt_long(argc, argv, "idzgo:f:a::hv", long_opts,
+                            &option_index)) != -1) {
     switch (opt) {
     case ('i'): {
       args->verbosity = INFO;
@@ -152,6 +153,9 @@ static void process_args(Args *args, int argc, char **argv) {
       exit(EXIT_SUCCESS);
     }
     default: {
+      if (long_opts[option_index].flag) {
+        break;
+      }
       print_usage();
       exit(EXIT_FAILURE);
     }
@@ -310,7 +314,7 @@ static unsigned char run_supervise_loop(pid_t process_pid, Display *dpy,
                                         Window *root, int *status) {
   unsigned char action = 0;
 
-  XSetWindowAttributes wa;
+  XSetWindowAttributes wa = {0};
   wa.event_mask = PropertyChangeMask;
   XChangeWindowAttributes(dpy, *root, CWEventMask, &wa);
 
@@ -336,19 +340,35 @@ static unsigned char run_supervise_loop(pid_t process_pid, Display *dpy,
       case KeyPress:
       case KeyRelease: {
         action = get_matching_action(dpy, event.xkey);
-        if (!action) {
+        if (action) {
+          kill(process_pid, SIGTERM);
+        } else {
           XAllowEvents(dpy, ReplayKeyboard, event.xkey.time);
           XFlush(dpy);
-        } else {
-          kill(process_pid, SIGTERM);
         }
+        break;
       }
       }
     }
   }
 
   UNGRAB(dpy, &active_window);
+  XAllowEvents(dpy, AsyncKeyboard, CurrentTime);
+  XSync(dpy, True);
+
   return action;
+}
+
+static int notify_cancel() {
+#ifdef HAVE_NOTIFY
+  char success_notification_summary[50];
+  snprintf(success_notification_summary, ARR_SIZE(success_notification_summary),
+           "%s: %s", PROGRAM_NAME, "recording was cancelled");
+  NotifyNotification *success_notification =
+      notify_notification_new(success_notification_summary, NULL, NULL);
+  return notify_notification_show(success_notification, NULL);
+#endif
+  return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -363,7 +383,7 @@ int main(int argc, char *argv[]) {
   Audio audio = {0};
 
 #ifdef HAVE_ZENITY
-  args->use_zenity = 0;
+  args.use_zenity = 0;
 #endif
   args.framerate = "10";
   args.audio = &audio;
@@ -428,13 +448,19 @@ int main(int argc, char *argv[]) {
       switch (action) {
       case SAVE: {
         char new_file[PATH_MAX];
-        if (get_output_file(new_file, sizeof(new_file), &args) < 0) {
+        int res = get_output_file(new_file, sizeof(new_file), &args);
+        if (res < 0) {
           remove_file(tmp_file);
 #ifdef HAVE_ZENITY
-          die("couldn't save the file in the default location, install "
-              "zenity or "
-              "define either the HOME or XDG_VIDEOS_DIR environment "
-              "variables\n");
+          if (res == -2) {
+            notify_cancel();
+            break;
+          } else {
+            die("couldn't save the file in the default location, install "
+                "zenity or "
+                "define either the HOME or XDG_VIDEOS_DIR environment "
+                "variables\n");
+          }
 #else
           die("couldn't save the file in the default location"
               "define either the HOME or XDG_VIDEOS_DIR environment "
@@ -448,7 +474,6 @@ int main(int argc, char *argv[]) {
         }
 
         remove_file(tmp_file);
-
 #ifdef HAVE_NOTIFY
         char success_notification_summary[50];
         snprintf(success_notification_summary,
@@ -475,22 +500,13 @@ int main(int argc, char *argv[]) {
         }
       }
       default: {
-#ifdef HAVE_NOTIFY
-        char success_notification_summary[50];
-        snprintf(success_notification_summary,
-                 ARR_SIZE(success_notification_summary), "%s: %s", PROGRAM_NAME,
-                 "recording was cancelled");
-        NotifyNotification *success_notification =
-            notify_notification_new(success_notification_summary, NULL, NULL);
-        notify_notification_show(success_notification, NULL);
-#endif
+        notify_cancel();
         break;
       }
       }
     }
   }
   }
-
 #ifdef HAVE_NOTIFY
   notify_uninit();
 #endif

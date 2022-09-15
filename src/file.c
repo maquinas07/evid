@@ -89,7 +89,11 @@ int get_output_file(char *new_file, size_t new_file_size, Args *args) {
 #endif
     if (pipep) {
       fgets(new_file, PATH_MAX, pipep);
-      new_file[strcspn(new_file, "\n")] = 0;
+      int length = strcspn(new_file, "\n");
+      if (length == 0) {
+        return -2;
+      }
+      new_file[length] = '\0';
       pclose(pipep);
       return 0;
     } else {
