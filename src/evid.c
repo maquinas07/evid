@@ -74,6 +74,7 @@ static void shutdown(int signo) {
 }
 
 static void process_args(Args *args, int argc, char **argv) {
+  int option_index = 0;
   struct option long_opts[] = {
       {"info", no_argument, &args->verbosity, INFO},
       {"debug", no_argument, &args->verbosity, DEBUG},
@@ -91,8 +92,8 @@ static void process_args(Args *args, int argc, char **argv) {
       {NULL, 0, NULL, 0}};
 
   int opt;
-  while ((opt = getopt_long(argc, argv, "idzgo:f:a::hv", long_opts, NULL)) !=
-         -1) {
+  while ((opt = getopt_long(argc, argv, "idzgo:f:a::hv", long_opts,
+                            &option_index)) != -1) {
     switch (opt) {
     case ('i'): {
       args->verbosity = INFO;
@@ -152,6 +153,9 @@ static void process_args(Args *args, int argc, char **argv) {
       exit(EXIT_SUCCESS);
     }
     default: {
+      if (long_opts[option_index].flag) {
+        break;
+      }
       print_usage();
       exit(EXIT_FAILURE);
     }
