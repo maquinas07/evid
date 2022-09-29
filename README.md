@@ -16,7 +16,16 @@ Runtime requirements
 
 Compile from source
 ---
-To compile from sources simply: 
+
+### Install compile dependencies
+
+#### Ubuntu/Debian:
+```bash
+sudo apt install libx11-dev libxext-dev libxfixes-dev libnotify-dev
+```
+
+  
+#### Then:
 ```bash
 make
 make install
