@@ -26,6 +26,7 @@
 #include "xrectsel.h"
 
 #ifdef HAVE_NOTIFY
+#include <libnotify/notification.h>
 #include <libnotify/notify.h>
 #endif
 
@@ -366,10 +367,34 @@ static int notify_cancel() {
            "%s: %s", PROGRAM_NAME, "recording was cancelled");
   NotifyNotification *success_notification =
       notify_notification_new(success_notification_summary, NULL, NULL);
-  return notify_notification_show(success_notification, NULL);
+  int result = notify_notification_show(success_notification, NULL);
+  g_object_unref(success_notification);
+  return result;
 #endif
   return 0;
 }
+
+#ifdef HAVE_NOTIFY
+static void
+show_in_file_manager_callback(NotifyNotification *notification,
+                                     char *action, gpointer loop) {
+  if (action != NULL) {
+    show_file_in_default_file_manager((const char *)action);
+  }
+  g_main_loop_quit(*((GMainLoop **)loop));
+}
+
+static int on_notification_closed(NotifyNotification *notification,
+                                  gpointer loop) {
+  g_main_loop_quit(*((GMainLoop **)loop));
+  return 0;
+}
+
+static int on_notification_timeout(gpointer loop) {
+  g_main_loop_quit(*((GMainLoop **)loop));
+  return 0;
+}
+#endif
 
 int main(int argc, char *argv[]) {
 #ifdef HAVE_NOTIFY
@@ -475,13 +500,25 @@ int main(int argc, char *argv[]) {
 
         remove_file(tmp_file);
 #ifdef HAVE_NOTIFY
+        GMainLoop *ml = g_main_loop_new(0, 1);
         char success_notification_summary[50];
         snprintf(success_notification_summary,
                  ARR_SIZE(success_notification_summary), "%s: %s", PROGRAM_NAME,
                  "recording saved successfuly");
         NotifyNotification *success_notification = notify_notification_new(
             success_notification_summary, new_file, NULL);
+        notify_notification_add_action(
+            success_notification, new_file, "success",
+            show_in_file_manager_callback, &ml, NULL);
         notify_notification_show(success_notification, NULL);
+        int timeout = 5000;
+        notify_notification_set_timeout(success_notification, timeout);
+        g_signal_connect(success_notification, "closed",
+                         G_CALLBACK(on_notification_closed), &ml);
+        g_timeout_add(timeout, on_notification_timeout, &ml);
+        g_main_loop_run(ml);
+        g_main_loop_unref(ml);
+        g_object_unref(success_notification);
 #endif
         break;
       }
@@ -495,6 +532,7 @@ int main(int argc, char *argv[]) {
           NotifyNotification *success_notification =
               notify_notification_new(success_notification_summary, NULL, NULL);
           notify_notification_show(success_notification, NULL);
+          g_object_unref(success_notification);
 #endif
           break;
         }

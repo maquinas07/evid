@@ -30,4 +30,6 @@ void move_file(const char *source_file, const char *dest_file);
 int remove_file(const char *file);
 int mkdirp(const char *dir);
 
+int show_file_in_default_file_manager(const char *file);
+
 #endif

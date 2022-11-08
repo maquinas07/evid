@@ -28,6 +28,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <gio/gio.h>
+
 #include <sys/cdefs.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
@@ -183,5 +185,48 @@ int mkdirp(const char *dir) {
     }
     *p = '/';
   }
+  return 0;
+}
+
+int show_file_in_default_file_manager(const char *file) {
+  GError *err = NULL;
+  GDBusProxy *proxy = g_dbus_proxy_new_for_bus_sync(
+      G_BUS_TYPE_SESSION,
+      G_DBUS_PROXY_FLAGS_DO_NOT_CONNECT_SIGNALS |
+          G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES,
+      NULL, "org.freedesktop.FileManager1", "/org/freedesktop/FileManager1",
+      "org.freedesktop.FileManager1", NULL, &err);
+  if (!proxy) {
+    error("failed to create DBUS proxy for FileManager1: %s\n", err->message);
+    g_error_free(err);
+    return -1;
+  }
+
+  gchar *uri = g_filename_to_uri(file, NULL, &err);
+  if (!uri) {
+    error("failed to convert to uri: %s\n", err->message);
+    g_error_free(err);
+    return -1;
+  }
+
+  GVariantBuilder builder;
+  g_variant_builder_init(&builder, G_VARIANT_TYPE("as"));
+  g_variant_builder_add(&builder, "s", uri);
+
+  g_free(uri);
+
+  const char *startupId = "";
+  GVariant *result = g_dbus_proxy_call_sync(
+      proxy, "ShowItems", g_variant_new("(ass)", &builder, startupId),
+      G_DBUS_CALL_FLAGS_NONE, -1, NULL, &err);
+
+  g_object_unref(proxy);
+  if (!result) {
+    error("failed to query file manager: %s\n", err->message);
+    g_error_free(err);
+    return -1;
+  }
+  g_variant_unref(result);
+
   return 0;
 }
