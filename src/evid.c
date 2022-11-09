@@ -375,13 +375,20 @@ static int notify_cancel() {
 }
 
 #ifdef HAVE_NOTIFY
-static void
-show_in_file_manager_callback(NotifyNotification *notification,
-                                     char *action, gpointer loop) {
-  if (action != NULL) {
-    show_file_in_default_file_manager((const char *)action);
+
+typedef struct ActionPayload ActionPayload;
+struct ActionPayload {
+  GMainLoop *loop;
+  const char *target_file;
+};
+
+static void show_in_file_manager_callback(NotifyNotification *notification,
+                                          char *action, gpointer payload) {
+  ActionPayload p = (*(ActionPayload *)payload);
+  if (p.target_file != NULL) {
+    show_file_in_default_file_manager(p.target_file);
   }
-  g_main_loop_quit(*((GMainLoop **)loop));
+  g_main_loop_quit(p.loop);
 }
 
 static int on_notification_closed(NotifyNotification *notification,
@@ -500,7 +507,9 @@ int main(int argc, char *argv[]) {
 
         remove_file(tmp_file);
 #ifdef HAVE_NOTIFY
-        GMainLoop *ml = g_main_loop_new(0, 1);
+        GMainLoop *main_loop = g_main_loop_new(0, 1);
+        ActionPayload action_payload = {.loop = main_loop,
+                                        .target_file = new_file};
         char success_notification_summary[50];
         snprintf(success_notification_summary,
                  ARR_SIZE(success_notification_summary), "%s: %s", PROGRAM_NAME,
@@ -508,16 +517,16 @@ int main(int argc, char *argv[]) {
         NotifyNotification *success_notification = notify_notification_new(
             success_notification_summary, new_file, NULL);
         notify_notification_add_action(
-            success_notification, new_file, "success",
-            show_in_file_manager_callback, &ml, NULL);
+            success_notification, "default", "Show in file manager",
+            show_in_file_manager_callback, &action_payload, NULL);
         notify_notification_show(success_notification, NULL);
         int timeout = 5000;
         notify_notification_set_timeout(success_notification, timeout);
         g_signal_connect(success_notification, "closed",
-                         G_CALLBACK(on_notification_closed), &ml);
-        g_timeout_add(timeout, on_notification_timeout, &ml);
-        g_main_loop_run(ml);
-        g_main_loop_unref(ml);
+                         G_CALLBACK(on_notification_closed), &main_loop);
+        g_timeout_add(timeout, on_notification_timeout, &main_loop);
+        g_main_loop_run(main_loop);
+        g_main_loop_unref(main_loop);
         g_object_unref(success_notification);
 #endif
         break;
