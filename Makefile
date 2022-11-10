@@ -5,8 +5,8 @@ CFLAGS_XEXTENSIONS=-DHAVE_XEXTENSIONS `pkg-config --cflags xfixes`
 LDFLAGS_XEXTENSIONS=`pkg-config --libs xfixes`
 
 # Comment if you want to disable the dependency to libnotify. Errors will be printed to stderr.
-CFLAGS_NOTIFY:=-DHAVE_NOTIFY `pkg-config --cflags libnotify`
-LDFLAGS_NOTIFY:=`pkg-config --libs libnotify`
+CFLAGS_NOTIFY:=-DHAVE_NOTIFY `pkg-config --cflags libnotify gio-2.0`
+LDFLAGS_NOTIFY:=`pkg-config --libs libnotify gio-2.0`
 
 # Uncomment if you want to be able to select the output folder via zenity
 # CFLAGS_ZENITY=-DHAVE_ZENITY
