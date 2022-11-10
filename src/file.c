@@ -28,13 +28,15 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <gio/gio.h>
-
 #include <sys/cdefs.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
 
 #include <linux/limits.h>
+
+#ifdef HAVE_NOTIFY
+#include <gio/gio.h>
+#endif
 
 void get_default_file_name(char *default_file_name, Args *args) {
   time_t rawtime = time(NULL);
@@ -188,6 +190,7 @@ int mkdirp(const char *dir) {
   return 0;
 }
 
+#ifdef HAVE_NOTIFY
 int show_file_in_default_file_manager(const char *file) {
   GError *err = NULL;
   GDBusProxy *proxy = g_dbus_proxy_new_for_bus_sync(
@@ -230,3 +233,4 @@ int show_file_in_default_file_manager(const char *file) {
 
   return 0;
 }
+#endif
